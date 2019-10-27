@@ -75,7 +75,7 @@ public class Diff {
             var right = AddressBook.parseFrom(new FileInputStream(args[1]));
 
             System.out.println(
-                    "Diff:\n" + compare(left, right)
+                    "Diff:\n" + compareAddressBook(left, right)
                             .map(Object::toString)
                             .collect(Collectors.joining("\n", "\n", "\n")));
 
@@ -84,12 +84,7 @@ public class Diff {
         }
     }
 
-    private static Stream<Difference> compare(AddressBook left, AddressBook right) {
-        return compareList(left.getPeopleList(), right.getPeopleList());
-
-    }
-
-    private static Stream<Difference> compareList(List<Person> left, List<Person> right) {
+    private static Stream<Difference> compareAddressBook(AddressBook left, AddressBook right) {
         var diffPhone = compose(
                 diffChildAsValue(Person.PhoneNumber::getNumber, "number"),
                 diffChildAsValue(Person.PhoneNumber::getType, "type"));
@@ -99,7 +94,8 @@ public class Diff {
                 diffChildAsValue(Person::getId, "id"),
                 diffChild(Person::getPhonesList, "phones", compareList(diffPhone)));
 
-        return testChild("persons", compareList(personDifferencer))
+        return compose(
+                diffChild(AddressBook::getPeopleList, "people", compareList(personDifferencer)))
                 .differences(new Path(""), left, right);
     }
 
@@ -121,10 +117,6 @@ public class Diff {
     private static <V> Differencer<List<V>> compareList(Differencer<V> elementDifferencer) {
         return (Path path, List<V> left, List<V> right) ->
                 Diff.<Integer, V>compareMap(elementDifferencer).differences(path, listToMap(left), listToMap(right));
-    }
-
-    private static <K, V> Differencer<Map<K, V>> compareChildMap(String mapName, Differencer<V> valueDifferencer) {
-        return testChild(mapName, compareMap(valueDifferencer));
     }
 
     private static <V> Differencer<V> testChild(String fieldName, Differencer<V> differencer) {
