@@ -32,13 +32,18 @@ public class RecursiveDifferencer {
                 RecursiveDifferencer.<Integer, V>diffMapValues(elementDiff).differences(path, listToMap(left), listToMap(right));
     }
 
+    public static <K, V> Differencer<List<V>> diffListElementsAsMap(Differencer<V> elementDiff, Function<V, K> keyMap) {
+        return (Path path, List<V> left, List<V> right) ->
+                RecursiveDifferencer.<K, V>diffMapValues(elementDiff).differences(path, listToMap(left, keyMap), listToMap(right, keyMap));
+    }
+
     public static <K, V> Differencer<Map<K, V>> diffMapValues(Differencer<V> valueDiff) {
         return (Path path, Map<K, V> left, Map<K, V> right) -> {
             var commonKeys = left.keySet().stream().filter(right::containsKey).collect(Collectors.toSet());
             var leftOnlyKeys = left.keySet().stream().filter(Predicate.not(commonKeys::contains));
             var rightOnlyKeys = right.keySet().stream().filter(Predicate.not(commonKeys::contains));
             return Stream.concat(
-                    diffInCommon(path, commonKeys, left, right, valueDiff),
+                    diffInCommon(commonKeys, valueDiff).differences(path, left, right),
                     Stream.concat(
                             diffLeftOnly(path, leftOnlyKeys, left::get),
                             diffRightOnly(path, rightOnlyKeys, right::get)));
@@ -57,13 +62,8 @@ public class RecursiveDifferencer {
         return keys.map(k -> Difference.leftOnly(path.sub(k.toString()), left.apply(k)));
     }
 
-    private static <K, V> Stream<Difference> diffInCommon(
-            Path path,
-            Set<K> keys,
-            Map<K, V> left,
-            Map<K, V> right,
-            Differencer<V> compareValues) {
-        return keys.stream()
+    private static <K, V> Differencer<Map<K, V>> diffInCommon(Set<K> keys, Differencer<V> compareValues) {
+        return (Path path, Map<K, V> left, Map<K, V> right) -> keys.stream()
                 .flatMap(k -> compareValues.differences(path.sub(k.toString()), left.get(k), right.get(k)));
     }
 
@@ -74,6 +74,10 @@ public class RecursiveDifferencer {
 
     private static <V> Differencer<V> diffWithEquals() {
         return RecursiveDifferencer.testIfEqual(Object::equals, Difference::unequal);
+    }
+
+    private static <K, V> Map<K,V> listToMap(List<V> list, Function<V, K> keyMap) {
+        return list.stream().collect(Collectors.toMap(keyMap, Function.identity()));
     }
 
     private static <V> Map<Integer, V> listToMap(List<V> list) {

@@ -21,18 +21,46 @@ public class Diff {
             return;
         }
 
-        try {
+        var bono = Person.newBuilder()
+                .setId(2)
+                .setName("bono")
+                .addPhones(Person.PhoneNumber.newBuilder()
+                        .setType(Person.PhoneType.MOBILE)
+                        .setNumber("0800-123-231")).build();
+        var bono2 = bono.toBuilder()
+                .clearPhones()
+                .addPhones(Person.PhoneNumber.newBuilder()
+                        .setType(Person.PhoneType.MOBILE)
+                        .setNumber("0800-132-231"));
+        var john = Person.newBuilder()
+                .setId(3)
+                .setName("john").build();
+        var carla = Person.newBuilder()
+                .setId(4)
+                .setName("carla").build();
+
+
+        var left = AddressBook.newBuilder()
+                .addPeople(bono)
+                .addPeople(john)
+                .addPeople(carla).build();
+        var right = AddressBook.newBuilder()
+                .addPeople(bono2)
+                .addPeople(carla).build();
+
+        System.out.println(
+                "Diff:\n" + compareAddressBook(left, right)
+                        .map(Object::toString)
+                        .collect(Collectors.joining("\n", "\n", "\n")));
+
+/*        try {
             var left = AddressBook.parseFrom(new FileInputStream(args[0]));
             var right = AddressBook.parseFrom(new FileInputStream(args[1]));
 
-            System.out.println(
-                    "Diff:\n" + compareAddressBook(left, right)
-                            .map(Object::toString)
-                            .collect(Collectors.joining("\n", "\n", "\n")));
 
         } catch (IOException e) {
             throw new RuntimeException(e);
-        }
+        }*/
     }
 
     private static Stream<Difference> compareAddressBook(AddressBook left, AddressBook right) {
@@ -46,7 +74,7 @@ public class Diff {
                 diffChild(Person::getPhonesList, "phones", diffListElements(diffPhone)));
 
         return compose(
-                diffChild(AddressBook::getPeopleList, "people", diffListElements(personDifferencer)))
+                diffChild(AddressBook::getPeopleList, "people", diffListElementsAsMap(personDifferencer, Person::getName)))
                 .differences(Path.root(), left, right);
     }
 }
