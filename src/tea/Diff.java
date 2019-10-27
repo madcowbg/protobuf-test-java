@@ -51,9 +51,10 @@ public class Diff {
         var leftOnlyKeys = left.keySet().stream().filter(Predicate.not(commonKeys::contains));
         var rightOnlyKeys = right.keySet().stream().filter(Predicate.not(commonKeys::contains));
         return Stream.concat(
-                diffInCommon(commonKeys, left, right, Person::equals, (k) -> (l, r) -> Stream.of(Difference.unequal(k, l, r))), Stream.concat(
-                diffLeftOnly(leftOnlyKeys, left::get),
-                diffRightOnly(rightOnlyKeys, right::get)));
+                diffInCommon(commonKeys, left, right, ifTestKey(Person::equals, Difference::unequalKey)),
+                Stream.concat(
+                        diffLeftOnly(leftOnlyKeys, left::get),
+                        diffRightOnly(rightOnlyKeys, right::get)));
     }
 
     private static <K, V> Stream<Difference> diffRightOnly(Stream<K> keys, Function<K, V> right) {
@@ -62,6 +63,14 @@ public class Diff {
 
     private static <K, V> Stream<Difference> diffLeftOnly(Stream<K> keys, Function<K, V> left) {
         return keys.map(k -> Difference.leftOnly(k, left.apply(k)));
+    }
+
+    private static <K, V> KeyDifferencer<K, V> ifTestKey(BiPredicate<V, V> equals, KeyDifferencer<K, V> differencer) {
+        return k -> ifTest(equals, differencer.forKey(k));
+    }
+
+    private static <V> Differencer<V> ifTest(BiPredicate<V, V> equals, Differencer<V> differencer) {
+        return (l, r) -> !equals.test(l, r) ? Stream.empty() : differencer.differences(l, r);
     }
 
     interface Differencer<V> {
@@ -76,10 +85,8 @@ public class Diff {
             Set<K> keys,
             Map<K, V> left,
             Map<K, V> right,
-            BiPredicate<V, V> equals,
             KeyDifferencer<K, V> compareValues) {
         return keys.stream()
-                .filter(k -> !equals.test(left.get(k), right.get(k)))
                 .flatMap(k -> compareValues.forKey(k).differences(left.get(k), right.get(k)));
     }
 
@@ -107,8 +114,8 @@ public class Diff {
             return new Difference("" + key + " = " + left.toString() + " in left only!");
         }
 
-        public static <T, K> Difference unequal(K key, T left, T right) {
-            return new Difference("" + key + ": " + left.toString() + " != " + right.toString());
+        public static <T, K> Differencer<T> unequalKey(K key) {
+            return (T left, T right) -> Stream.of(new Difference("" + key + ": " + left.toString() + " != " + right.toString()));
         }
     }
 }
